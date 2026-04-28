@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { Chess } from 'chess.js';
 
 const TILE = 80;            // 8 * 80 = 640
 const ORIGIN_X = 40;
@@ -7,16 +8,17 @@ const BOARD_PX = TILE * 8;  // 640
 const FILES = ['a','b','c','d','e','f','g','h'];
 const RANKS = ['1','2','3','4','5','6','7','8'];
 
-const PIECE_GLYPH = {
-  w: { p: '♙', n: '♘', b: '♗', r: '♖', q: '♕', k: '♔' },
-  b: { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚' },
-};
+// Chess.com-style "Green" theme.
+const LIGHT = 0xeeeed2;
+const DARK  = 0x769656;
+const SELECTED = 0xf6f669;       // yellow tint for selected square
+const LAST_MOVE = 0xf6f669;       // yellow tint for last move
+const MOVE_DOT = 0x000000;        // semi-transparent black for legal move markers
+const MOVE_DOT_ALPHA = 0.18;
 
-const LIGHT = 0xe5d4a0;
-const DARK = 0x6e3f1d;
-const FROM_HI = 0x7cd1ff;
-const LAVA = 0xff5e3a;
-const WALL = 0x4a3a78;
+// Filled chess glyphs render the same shape regardless of color; we paint
+// black with dark fill + light outline and white with light fill + dark outline.
+const PIECE_GLYPH = { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚' };
 const LABEL_COLOR = '#b0b0c8';
 
 export class BoardScene extends Phaser.Scene {
@@ -27,7 +29,8 @@ export class BoardScene extends Phaser.Scene {
     this.tileEffectSprites = {};
     this.pieceEffectSprites = {};
     this.fromSquare = null;
-    this.toHighlights = [];
+    this.lastMoveHighlights = [];
+    this.moveMarkers = [];        // legal-move dots/rings for the selected piece
     this.state = null;
     this.myColor = 'white';
     this.created = false;
@@ -40,30 +43,27 @@ export class BoardScene extends Phaser.Scene {
   }
 
   create() {
-    // Re-read myColor in case it was set after init but before create.
     if (this.shared?.myColor) this.myColor = this.shared.myColor;
 
     this.cameras.main.setBackgroundColor(0x0d0a1f);
 
-    // Decorative frame
+    // Subtle frame around the board
     this.add.rectangle(
       ORIGIN_X + BOARD_PX / 2,
       ORIGIN_Y + BOARD_PX / 2,
-      BOARD_PX + 16,
-      BOARD_PX + 16,
-      0x1a1033
-    ).setStrokeStyle(2, 0x3a2670);
+      BOARD_PX + 12,
+      BOARD_PX + 12,
+      0x1f1f1f
+    ).setStrokeStyle(2, 0x2c2c2c);
 
-    // Tiles — placed via squareXY so position matches piece layout for the
-    // current perspective. setData('sq', sq) ensures clicks always emit the
-    // logical square regardless of how the board is rotated visually.
+    // Tiles
     for (let f = 0; f < 8; f++) {
       for (let r = 0; r < 8; r++) {
         const sq = `${FILES[f]}${RANKS[r]}`;
         const x = squareX(sq, this.myColor);
         const y = squareY(sq, this.myColor);
         const dark = (f + r) % 2 === 0;
-        const rect = this.add.rectangle(x, y, TILE - 2, TILE - 2, dark ? DARK : LIGHT)
+        const rect = this.add.rectangle(x, y, TILE, TILE, dark ? DARK : LIGHT)
           .setInteractive()
           .setData('sq', sq);
         rect.on('pointerdown', () => this.handleClick(sq));
@@ -71,7 +71,7 @@ export class BoardScene extends Phaser.Scene {
       }
     }
 
-    // File labels below the board (a-h or h-a depending on perspective)
+    // File labels below the board
     for (let col = 0; col < 8; col++) {
       const file = this.myColor === 'black' ? FILES[7 - col] : FILES[col];
       this.add.text(
@@ -81,7 +81,7 @@ export class BoardScene extends Phaser.Scene {
         { fontFamily: '"Press Start 2P", monospace', fontSize: '11px', color: LABEL_COLOR }
       ).setOrigin(0.5);
     }
-    // Rank labels left of the board (8-1 or 1-8 depending on perspective)
+    // Rank labels left of the board
     for (let row = 0; row < 8; row++) {
       const rank = this.myColor === 'black' ? RANKS[row] : RANKS[7 - row];
       this.add.text(
@@ -94,7 +94,6 @@ export class BoardScene extends Phaser.Scene {
 
     this.created = true;
 
-    // Apply any state buffered by the React layer before create() ran.
     if (this.shared?.state) {
       this.applyState(this.shared.state, this.shared.myColor);
     }
@@ -114,24 +113,80 @@ export class BoardScene extends Phaser.Scene {
       this.clearSelection();
     } else if (piece && piece.color === (this.myColor === 'white' ? 'w' : 'b')) {
       this.fromSquare = sq;
-      this.tileSprites[sq]?.setFillStyle(FROM_HI);
+      this.tintTile(sq, SELECTED, 0.55);
+      this.showLegalMovesFrom(sq);
     }
   }
 
   clearSelection() {
-    if (this.fromSquare && this.tileSprites[this.fromSquare]) {
-      const f = FILES.indexOf(this.fromSquare[0]);
-      const r = RANKS.indexOf(this.fromSquare[1]);
-      const dark = (f + r) % 2 === 0;
-      this.tileSprites[this.fromSquare].setFillStyle(dark ? DARK : LIGHT);
+    if (this.fromSquare) {
+      this.restoreTile(this.fromSquare);
+      this.fromSquare = null;
     }
-    this.fromSquare = null;
+    this.clearMoveMarkers();
+  }
+
+  tintTile(sq, color, alpha = 0.5) {
+    const tile = this.tileSprites[sq];
+    if (!tile) return;
+    // Apply by changing fill color to a blend; we use a yellow tint by
+    // overlaying a translucent rect on top, since changing fillStyle would
+    // lose the original square color when restored.
+    const x = squareX(sq, this.myColor);
+    const y = squareY(sq, this.myColor);
+    const overlay = this.add.rectangle(x, y, TILE, TILE, color, alpha).setDepth(1);
+    tile.setData('overlay', overlay);
+  }
+
+  restoreTile(sq) {
+    const tile = this.tileSprites[sq];
+    if (!tile) return;
+    const overlay = tile.getData('overlay');
+    if (overlay) { overlay.destroy(); tile.setData('overlay', null); }
+  }
+
+  showLegalMovesFrom(fromSq) {
+    this.clearMoveMarkers();
+    if (!this.state?.fen) return;
+    let chess;
+    try {
+      chess = new Chess(this.state.fen);
+    } catch (_) { return; }
+    let moves;
+    try { moves = chess.moves({ square: fromSq, verbose: true }); }
+    catch (_) { return; }
+    const board = parseFEN(this.state.fen);
+    for (const mv of moves || []) {
+      const x = squareX(mv.to, this.myColor);
+      const y = squareY(mv.to, this.myColor);
+      const targetPiece = board[mv.to];
+      if (targetPiece || mv.flags?.includes('e')) {
+        // Capturable: ring around the target square
+        const ring = this.add.circle(x, y, TILE / 2 - 2, 0x000000, 0)
+          .setStrokeStyle(5, 0x000000, MOVE_DOT_ALPHA + 0.1)
+          .setDepth(2);
+        this.moveMarkers.push(ring);
+      } else {
+        // Empty: small dot in center
+        const dot = this.add.circle(x, y, TILE * 0.14, MOVE_DOT, MOVE_DOT_ALPHA).setDepth(2);
+        this.moveMarkers.push(dot);
+      }
+    }
+  }
+
+  clearMoveMarkers() {
+    for (const m of this.moveMarkers) m.destroy();
+    this.moveMarkers = [];
   }
 
   applyState(state, myColor) {
     this.state = state;
     if (myColor) this.myColor = myColor;
     if (!this.created) return;
+    // If the selected piece moved or was captured, drop the selection.
+    if (this.fromSquare && !parseFEN(state.fen)[this.fromSquare]) {
+      this.clearSelection();
+    }
     this.renderPieces();
     this.renderTileEffects();
     this.renderPieceEffects();
@@ -149,23 +204,25 @@ export class BoardScene extends Phaser.Scene {
     }
     for (const sq of Object.keys(board)) {
       const p = board[sq];
-      const glyph = PIECE_GLYPH[p.color][p.type];
+      const glyph = PIECE_GLYPH[p.type];
       const x = squareX(sq, this.myColor);
       const y = squareY(sq, this.myColor);
+      const fill = p.color === 'w' ? '#f8f8f8' : '#1f1f1f';
+      const outline = p.color === 'w' ? '#1f1f1f' : '#f8f8f8';
       let sprite = this.pieceSprites[sq];
       if (!sprite) {
         sprite = this.add.text(x, y, glyph, {
-          fontFamily: 'serif',
-          fontSize: '60px',
-          color: p.color === 'w' ? '#f8f8f8' : '#1a1033',
-          stroke: p.color === 'w' ? '#1a1033' : '#f0e8d8',
+          fontFamily: '"Segoe UI Symbol", "Apple Symbols", "Noto Sans Symbols 2", serif',
+          fontSize: '70px',
+          color: fill,
+          stroke: outline,
           strokeThickness: 3,
         }).setOrigin(0.5).setDepth(10);
         this.pieceSprites[sq] = sprite;
       } else {
         sprite.setText(glyph);
-        sprite.setColor(p.color === 'w' ? '#f8f8f8' : '#1a1033');
-        sprite.setStroke(p.color === 'w' ? '#1a1033' : '#f0e8d8', 3);
+        sprite.setColor(fill);
+        sprite.setStroke(outline, 3);
         this.tweens.add({ targets: sprite, x, y, duration: 200, ease: 'Cubic.easeOut' });
       }
       sprite.setPosition(x, y);
@@ -192,7 +249,7 @@ export class BoardScene extends Phaser.Scene {
     const y = squareY(sq, this.myColor);
     switch (effect.type) {
       case 'lava': {
-        const r = this.add.rectangle(x, y, TILE - 4, TILE - 4, LAVA, 0.8).setDepth(2);
+        const r = this.add.rectangle(x, y, TILE - 4, TILE - 4, 0xff5e3a, 0.8).setDepth(2);
         this.tweens.add({ targets: r, alpha: 0.5, duration: 600, yoyo: true, repeat: -1 });
         return [r];
       }
@@ -216,7 +273,7 @@ export class BoardScene extends Phaser.Scene {
         return [r];
       }
       case 'wall': {
-        const r = this.add.rectangle(x, y, TILE - 4, TILE - 4, WALL, 1).setStrokeStyle(2, 0xffd84d).setDepth(5);
+        const r = this.add.rectangle(x, y, TILE - 4, TILE - 4, 0x4a3a78, 1).setStrokeStyle(2, 0xffd84d).setDepth(5);
         const txt = this.add.text(x, y, '▦', { fontFamily: 'serif', fontSize: '32px', color: '#ffd84d' }).setOrigin(0.5).setDepth(5);
         return [r, txt];
       }
@@ -275,15 +332,15 @@ export class BoardScene extends Phaser.Scene {
   }
 
   renderLastMoveHighlight() {
-    this.toHighlights.forEach(s => s.destroy());
-    this.toHighlights = [];
+    this.lastMoveHighlights.forEach(s => s.destroy());
+    this.lastMoveHighlights = [];
     const last = this.state?.lastMove;
     if (!last) return;
     for (const sq of [last.from, last.to]) {
       const x = squareX(sq, this.myColor);
       const y = squareY(sq, this.myColor);
-      const r = this.add.rectangle(x, y, TILE - 4, TILE - 4, FROM_HI, 0.25).setDepth(1);
-      this.toHighlights.push(r);
+      const r = this.add.rectangle(x, y, TILE, TILE, LAST_MOVE, 0.45).setDepth(0.5);
+      this.lastMoveHighlights.push(r);
     }
   }
 

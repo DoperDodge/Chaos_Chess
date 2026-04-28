@@ -1,5 +1,3 @@
-import { getRuleById } from '@chaotic-chess/shared/rules';
-
 export function registerSocketHandlers(io, registry) {
   io.on('connection', (socket) => {
     console.log(`[socket] connect ${socket.id}`);
@@ -54,6 +52,7 @@ export function registerSocketHandlers(io, registry) {
       if (lobby.bothReady()) {
         const start = lobby.startGame();
         if (start.ok) {
+          ensurePendingPick(start.game);
           io.to(lobby.code).emit('game:start', {
             state: start.game.publicState(),
             colors: {
@@ -61,7 +60,6 @@ export function registerSocketHandlers(io, registry) {
               [lobby.guest.socketId]: lobby.guest.color,
             },
           });
-          maybeRequestPick(io, lobby);
         }
       }
       ack?.({ ok: true });
@@ -91,8 +89,9 @@ export function registerSocketHandlers(io, registry) {
         events.push({ type: 'extra-turn-active', color: justMoved });
         game.extraTurnFor = null;
       }
+      // Pending pick must be set BEFORE broadcasting so both clients see it.
+      ensurePendingPick(game);
       io.to(lobby.code).emit('game:state', { state: game.publicState(), events });
-      maybeRequestPick(io, lobby);
     });
 
     socket.on('game:pick-rule', ({ ruleId }, ack) => {
@@ -150,23 +149,16 @@ export function registerSocketHandlers(io, registry) {
   });
 }
 
-function maybeRequestPick(io, lobby) {
-  const game = lobby.game;
+// Sets game.pendingPick if a rule pick is due. Does NOT emit — the caller
+// is responsible for broadcasting the new state so the client sees pendingPick.
+function ensurePendingPick(game) {
   if (!game || game.gameOver || game.pendingPick) return;
-  // Check the latest event was rule-pick-required, otherwise nothing to do.
-  // We re-check by looking at picker for previous turn boundary
   const lastTurn = game.turnNumber - 1;
   const picker = game.pickerForTurn(lastTurn);
   if (!picker) return;
-  // Only request if no rule has been activated for this turn boundary yet
   const offerings = game.engine.generateOfferings(game.settings.rulesPerPick || 3);
   if (!offerings.length) return;
   game.pendingPick = { picker, offerings, expiresAt: Date.now() + 30000 };
-  const detailedOfferings = offerings.map(id => {
-    const r = getRuleById(id);
-    return { id, name: r.name, category: r.category, duration: r.duration, flavor: r.flavor, desc: r.desc };
-  });
-  io.to(lobby.code).emit('game:rule-pick', { picker, offerings: detailedOfferings });
 }
 
 function skipCurrentSide(game) {

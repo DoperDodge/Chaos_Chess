@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useSocket } from '../shared/socket.jsx';
 import { mountPhaser } from './phaser/mount.js';
+import { getRuleById } from '@chaotic-chess/shared/rules';
 import ActiveRulesDropdown from './ui/ActiveRulesDropdown.jsx';
 import RulePickModal from './ui/RulePickModal.jsx';
 import GameHUD from './ui/GameHUD.jsx';
@@ -11,8 +12,7 @@ export default function GameView({ initial, onLeave }) {
   const phaserContainer = useRef(null);
   const phaserRef = useRef(null);
   const [state, setState] = useState(initial?.state);
-  const [myColor, setMyColor] = useState(initial?.colors?.[socket.id] || null);
-  const [rulePick, setRulePick] = useState(null);
+  const [myColor] = useState(initial?.colors?.[socket.id] || null);
   const [recentEvents, setRecentEvents] = useState([]);
   const [error, setError] = useState('');
 
@@ -46,22 +46,39 @@ export default function GameView({ initial, onLeave }) {
         if (phaserRef.current) phaserRef.current.playEvents(events);
       }
     };
-    const onPick = (payload) => setRulePick(payload);
     const onState = (s) => setState(s);
     socket.on('game:state', onStateUpdate);
-    socket.on('game:rule-pick', onPick);
     socket.on('game:state-snapshot', onState);
+    // game:rule-pick still arrives but pendingPick on the state is the source
+    // of truth — we ignore the legacy event so both clients stay in sync.
     return () => {
       socket.off('game:state', onStateUpdate);
-      socket.off('game:rule-pick', onPick);
       socket.off('game:state-snapshot', onState);
     };
   }, [socket]);
 
+  // Modal payload derived from server-authoritative pendingPick. When the
+  // server clears pendingPick (because the picker chose a rule), the modal
+  // automatically closes for both players.
+  const pickPayload = useMemo(() => {
+    const pp = state?.pendingPick;
+    if (!pp) return null;
+    return {
+      picker: pp.picker,
+      offerings: (pp.offerings || []).map((id) => {
+        const r = getRuleById(id);
+        return r
+          ? { id, name: r.name, category: r.category, duration: r.duration, flavor: r.flavor, desc: r.desc }
+          : { id, name: `Rule ${id}`, category: 'Wild', duration: '?', flavor: '', desc: '' };
+      }),
+    };
+  }, [state?.pendingPick]);
+
   const pickRule = (ruleId) => {
     socket.emit('game:pick-rule', { ruleId }, (resp) => {
-      if (resp?.ok) setRulePick(null);
-      else setError(resp?.error || 'pick failed');
+      if (!resp?.ok) setError(resp?.error || 'pick failed');
+      // No local close — when the server broadcasts the new state with
+      // pendingPick: null, the modal closes for everyone.
     });
   };
 
@@ -71,7 +88,7 @@ export default function GameView({ initial, onLeave }) {
 
   if (!state) return <div className="p-8 text-center font-pixel text-gold">LOADING GAME...</div>;
 
-  const canPick = rulePick && state && myColor === rulePick.picker;
+  const canPick = !!pickPayload && myColor === pickPayload.picker;
 
   return (
     <div className="h-full flex flex-col">
@@ -97,9 +114,9 @@ export default function GameView({ initial, onLeave }) {
         )}
       </div>
 
-      {rulePick && (
+      {pickPayload && (
         <RulePickModal
-          payload={rulePick}
+          payload={pickPayload}
           canPick={canPick}
           onPick={pickRule}
         />
