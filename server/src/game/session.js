@@ -101,13 +101,28 @@ export class GameSession {
     const blocking = intercept.find(e => e.type === 'move-blocked');
     if (blocking) return { ok: false, error: blocking.reason || 'move blocked', events: intercept };
 
+    // Some rules (e.g. Backwards Pawns) apply the move themselves by writing
+    // directly to the chess.js board. They emit move-applied-manually so we
+    // skip the standard chess.move() call and synthesize a move record.
+    const manual = intercept.find(e => e.type === 'move-applied-manually');
     let moveResult;
-    try {
-      moveResult = this.chess.move({ from, to, promotion: promotion || 'q' });
-    } catch (_) {
-      moveResult = null;
+    if (manual) {
+      moveResult = {
+        from: manual.from,
+        to: manual.to,
+        color: color === 'white' ? 'w' : 'b',
+        flags: 'm',
+        piece: manual.piece || 'p',
+        san: `${manual.from}-${manual.to}`,
+      };
+    } else {
+      try {
+        moveResult = this.chess.move({ from, to, promotion: promotion || 'q' });
+      } catch (_) {
+        moveResult = null;
+      }
+      if (!moveResult) return { ok: false, error: 'illegal move' };
     }
-    if (!moveResult) return { ok: false, error: 'illegal move' };
 
     const post = this.afterMove(moveResult);
     return { ok: true, move: moveResult, events: [...intercept, ...post] };

@@ -144,3 +144,24 @@ export function removePieceEffectsByInstance(session, instanceId) {
 }
 
 export function colorChar(color) { return color === 'white' ? 'w' : 'b'; }
+
+export function squaresInRow(rank) {
+  return ['a','b','c','d','e','f','g','h'].map(f => `${f}${rank}`);
+}
+
+export function squaresInColumn(file) {
+  return ['1','2','3','4','5','6','7','8'].map(r => `${file}${r}`);
+}
+
+export function findKingSquare(session, color) {
+  const cc = color === 'white' ? 'w' : 'b';
+  for (const sq of ALL_SQUARES) {
+    const p = session.chess.get(sq);
+    if (p && p.type === 'k' && p.color === cc) return sq;
+  }
+  return null;
+}
+
+export function shiftSquare(sq, df, dr) {
+  return squareFrom(fileIndex(sq) + df, rankIndex(sq) + dr);
+}
