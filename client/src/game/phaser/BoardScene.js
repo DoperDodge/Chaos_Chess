@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 const TILE = 80;            // 8 * 80 = 640
 const ORIGIN_X = 40;
 const ORIGIN_Y = 40;
+const BOARD_PX = TILE * 8;   // 640
 const FILES = ['a','b','c','d','e','f','g','h'];
 const RANKS = ['1','2','3','4','5','6','7','8'];
 
@@ -19,6 +20,7 @@ const LAVA = 0xff5e3a;
 const ICE_TINT = 0xa6e3ff;
 const WALL = 0x4a3a78;
 const MARK = 0xff3030;
+const LABEL_COLOR = '#b0b0c8';
 
 export class BoardScene extends Phaser.Scene {
   constructor() {
@@ -31,6 +33,7 @@ export class BoardScene extends Phaser.Scene {
     this.toHighlights = [];
     this.state = null;
     this.myColor = 'white';
+    this.created = false;
   }
 
   init(data) {
@@ -40,9 +43,14 @@ export class BoardScene extends Phaser.Scene {
   create() {
     this.cameras.main.setBackgroundColor(0x0d0a1f);
 
-    // Decorative border
-    this.add.rectangle(ORIGIN_X + TILE * 4, ORIGIN_Y + TILE * 4, TILE * 8 + 16, TILE * 8 + 16, 0x1a1033)
-      .setStrokeStyle(4, 0xffd84d);
+    // Decorative border around just the board
+    this.add.rectangle(
+      ORIGIN_X + BOARD_PX / 2,
+      ORIGIN_Y + BOARD_PX / 2,
+      BOARD_PX + 16,
+      BOARD_PX + 16,
+      0x1a1033
+    ).setStrokeStyle(2, 0x3a2670);
 
     // Tiles
     for (let f = 0; f < 8; f++) {
@@ -57,21 +65,37 @@ export class BoardScene extends Phaser.Scene {
           .setData('sq', sq);
         rect.on('pointerdown', () => this.handleClick(sq));
         this.tileSprites[sq] = rect;
-        // Tile coordinate label
-        if (r === 0) {
-          this.add.text(x, y + TILE / 2 - 14, FILES[f].toUpperCase(), {
-            fontFamily: '"Press Start 2P", monospace', fontSize: '8px', color: '#ffd84d',
-          }).setOrigin(0.5);
-        }
-        if (f === 0) {
-          this.add.text(x - TILE / 2 + 8, y, RANKS[r], {
-            fontFamily: '"Press Start 2P", monospace', fontSize: '8px', color: '#ffd84d',
-          }).setOrigin(0.5);
-        }
       }
     }
 
-    // Particle / FX layer container is implicit (we just add sprites)
+    // File labels (a-h) BELOW the board
+    for (let f = 0; f < 8; f++) {
+      this.add.text(
+        ORIGIN_X + f * TILE + TILE / 2,
+        ORIGIN_Y + BOARD_PX + 18,
+        FILES[f].toUpperCase(),
+        { fontFamily: '"Press Start 2P", monospace', fontSize: '11px', color: LABEL_COLOR }
+      ).setOrigin(0.5);
+    }
+    // Rank labels (1-8) LEFT of the board
+    for (let r = 0; r < 8; r++) {
+      this.add.text(
+        ORIGIN_X - 18,
+        ORIGIN_Y + (7 - r) * TILE + TILE / 2,
+        RANKS[r],
+        { fontFamily: '"Press Start 2P", monospace', fontSize: '11px', color: LABEL_COLOR }
+      ).setOrigin(0.5);
+    }
+
+    this.created = true;
+
+    // Apply any state that was pushed before create() ran
+    if (this.state) {
+      this.renderPieces();
+      this.renderTileEffects();
+      this.renderPieceEffects();
+      this.renderLastMoveHighlight();
+    }
   }
 
   handleClick(sq) {
@@ -101,6 +125,7 @@ export class BoardScene extends Phaser.Scene {
   applyState(state, myColor) {
     this.state = state;
     if (myColor) this.myColor = myColor;
+    if (!this.created) return; // create() will replay this once it runs
     this.renderPieces();
     this.renderTileEffects();
     this.renderPieceEffects();
@@ -108,6 +133,7 @@ export class BoardScene extends Phaser.Scene {
   }
 
   renderPieces() {
+    if (!this.state) return;
     const board = parseFEN(this.state.fen);
     // Remove sprites for missing pieces
     for (const sq of Object.keys(this.pieceSprites)) {
@@ -147,7 +173,7 @@ export class BoardScene extends Phaser.Scene {
       this.tileEffectSprites[sq].forEach(s => s.destroy());
     }
     this.tileEffectSprites = {};
-    const effects = this.state.tileEffects || {};
+    const effects = this.state?.tileEffects || {};
     for (const sq of Object.keys(effects)) {
       for (const e of effects[sq]) {
         const sprites = this.drawTileEffect(sq, e);
@@ -201,7 +227,7 @@ export class BoardScene extends Phaser.Scene {
       this.pieceEffectSprites[sq].forEach(s => s.destroy());
     }
     this.pieceEffectSprites = {};
-    const effects = this.state.pieceEffects || {};
+    const effects = this.state?.pieceEffects || {};
     for (const sq of Object.keys(effects)) {
       for (const e of effects[sq]) {
         const sprites = this.drawPieceEffect(sq, e);
@@ -248,7 +274,7 @@ export class BoardScene extends Phaser.Scene {
   renderLastMoveHighlight() {
     this.toHighlights.forEach(s => s.destroy());
     this.toHighlights = [];
-    const last = this.state.lastMove;
+    const last = this.state?.lastMove;
     if (!last) return;
     for (const sq of [last.from, last.to]) {
       const x = squareX(sq, this.myColor);
@@ -259,6 +285,7 @@ export class BoardScene extends Phaser.Scene {
   }
 
   playEvents(events) {
+    if (!this.created) return;
     for (const e of events || []) this.playOneEvent(e);
   }
 
@@ -275,7 +302,6 @@ export class BoardScene extends Phaser.Scene {
           duration: 500,
           onComplete: () => c.destroy(),
         });
-        // Use scale on a rectangle as fallback
         const ring = this.add.circle(x, y, TILE / 2, 0xffd84d, 0).setStrokeStyle(3, 0xffd84d);
         this.tweens.add({
           targets: ring,
@@ -303,7 +329,6 @@ export class BoardScene extends Phaser.Scene {
         break;
       }
       case 'rule-activated': {
-        // Show a banner for ~1.5 seconds
         const w = this.cameras.main.width;
         const h = this.cameras.main.height;
         const banner = this.add.rectangle(w / 2, h / 2, 600, 80, 0x1a1033, 0.95).setStrokeStyle(3, 0xffd84d).setDepth(100);
