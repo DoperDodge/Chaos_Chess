@@ -1,0 +1,11 @@
+{
+  "name": "@chaotic-chess/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "rules.js",
+  "exports": {
+    "./rules": "./rules.js",
+    "./constants": "./constants.js"
+  }
+}
