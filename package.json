@@ -1,0 +1,21 @@
+{
+  "name": "chaotic-chess",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chaotic Chess - multiplayer chess with 100 chaos rules",
+  "workspaces": [
+    "client",
+    "server",
+    "shared"
+  ],
+  "scripts": {
+    "build": "npm run build -w client",
+    "start": "node server/src/index.js",
+    "dev:server": "node --watch server/src/index.js",
+    "dev:client": "npm run dev -w client",
+    "postinstall": "echo \"workspaces installed\""
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
