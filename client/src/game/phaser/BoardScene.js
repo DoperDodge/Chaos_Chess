@@ -148,20 +148,25 @@ export class BoardScene extends Phaser.Scene {
 
   showLegalMovesFrom(fromSq) {
     this.clearMoveMarkers();
-    if (!this.state?.fen) return;
-    let chess;
-    try {
-      chess = new Chess(this.state.fen);
-    } catch (_) { return; }
-    let moves;
-    try { moves = chess.moves({ square: fromSq, verbose: true }); }
-    catch (_) { return; }
+    // Prefer the server-computed legalMoves map (already accounts for chaos
+    // rules like Berserker Pawn / Slow Motion / Knight's Curse). Fall back to
+    // a local chess.js computation if the server hasn't sent the map yet.
+    let moves = this.state?.legalMoves?.[fromSq];
+    if (!moves) {
+      if (!this.state?.fen) return;
+      try {
+        const chess = new Chess(this.state.fen);
+        const native = chess.moves({ square: fromSq, verbose: true }) || [];
+        moves = native.map(m => ({ to: m.to, captured: m.captured, flags: m.flags }));
+      } catch (_) { return; }
+    }
     const board = parseFEN(this.state.fen);
     for (const mv of moves || []) {
       const x = squareX(mv.to, this.myColor);
       const y = squareY(mv.to, this.myColor);
       const targetPiece = board[mv.to];
-      if (targetPiece || mv.flags?.includes('e')) {
+      const isCapture = !!targetPiece || !!mv.captured || mv.flags?.includes('e');
+      if (isCapture) {
         // Capturable: ring around the target square
         const ring = this.add.circle(x, y, TILE / 2 - 2, 0x000000, 0)
           .setStrokeStyle(5, 0x000000, MOVE_DOT_ALPHA + 0.1)
