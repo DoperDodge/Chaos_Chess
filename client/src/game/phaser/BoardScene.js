@@ -249,33 +249,118 @@ export class BoardScene extends Phaser.Scene {
     const y = squareY(sq, this.myColor);
     switch (effect.type) {
       case 'lava': {
-        const r = this.add.rectangle(x, y, TILE - 4, TILE - 4, 0xff5e3a, 0.8).setDepth(2);
-        this.tweens.add({ targets: r, alpha: 0.5, duration: 600, yoyo: true, repeat: -1 });
-        return [r];
+        const r = this.add.rectangle(x, y, TILE - 4, TILE - 4, 0xff5e3a, 0.85).setDepth(2);
+        const glyph = this.add.text(x, y, '🔥', { fontSize: '34px' }).setOrigin(0.5).setDepth(3);
+        this.tweens.add({ targets: r, alpha: 0.55, duration: 600, yoyo: true, repeat: -1 });
+        this.tweens.add({ targets: glyph, scale: 1.15, duration: 700, yoyo: true, repeat: -1 });
+        return [r, glyph];
       }
       case 'mine': {
-        const r = this.add.circle(x, y, 4, 0x66cc66, 0.4).setDepth(2);
+        // Subtly hint at a hidden mine — only a tiny dot, since the rule is "invisible".
+        const r = this.add.circle(x, y, 5, 0x66cc66, 0.5).setDepth(2);
+        this.tweens.add({ targets: r, alpha: 0.2, duration: 800, yoyo: true, repeat: -1 });
         return [r];
       }
       case 'cluster-marker': {
-        const r = this.add.text(x, y, 'X', { fontFamily: '"Press Start 2P", monospace', fontSize: '24px', color: '#ff3030' }).setOrigin(0.5).setDepth(2);
+        const r = this.add.text(x, y, 'X', { fontFamily: '"Press Start 2P", monospace', fontSize: '28px', color: '#ff3030' })
+          .setOrigin(0.5).setDepth(2);
         this.tweens.add({ targets: r, alpha: 0.4, duration: 400, yoyo: true, repeat: -1 });
         return [r];
       }
       case 'doomsday': {
-        const r = this.add.rectangle(x, y, TILE - 6, TILE - 6, 0x9933ff, 0.4).setDepth(2);
-        this.tweens.add({ targets: r, alpha: 0.8, duration: 500, yoyo: true, repeat: -1 });
-        return [r];
+        const r = this.add.rectangle(x, y, TILE - 6, TILE - 6, 0x9933ff, 0.45).setDepth(2);
+        const ring = this.add.circle(x, y, TILE / 2 - 6, 0xffd84d, 0).setStrokeStyle(2, 0xffd84d, 0.6).setDepth(2);
+        this.tweens.add({ targets: r, alpha: 0.85, duration: 500, yoyo: true, repeat: -1 });
+        this.tweens.add({ targets: ring, scale: 1.1, duration: 800, yoyo: true, repeat: -1 });
+        return [r, ring];
       }
-      case 'volcano-warning': {
+      case 'volcano-warning':
+      case 'spike-warning': {
         const r = this.add.rectangle(x, y, TILE - 4, TILE - 4, 0xff3030, 0.5).setDepth(2);
-        this.tweens.add({ targets: r, alpha: 0.2, duration: 400, yoyo: true, repeat: -1 });
+        this.tweens.add({ targets: r, alpha: 0.15, duration: 350, yoyo: true, repeat: -1 });
         return [r];
       }
       case 'wall': {
         const r = this.add.rectangle(x, y, TILE - 4, TILE - 4, 0x4a3a78, 1).setStrokeStyle(2, 0xffd84d).setDepth(5);
-        const txt = this.add.text(x, y, '▦', { fontFamily: 'serif', fontSize: '32px', color: '#ffd84d' }).setOrigin(0.5).setDepth(5);
+        const txt = this.add.text(x, y, '▦', { fontFamily: 'serif', fontSize: '36px', color: '#ffd84d' }).setOrigin(0.5).setDepth(5);
         return [r, txt];
+      }
+      case 'dragon-egg': {
+        const r = this.add.rectangle(x, y, TILE - 8, TILE - 8, 0x7cff7a, 0.3).setDepth(2);
+        const egg = this.add.text(x, y, '🥚', { fontSize: '40px' }).setOrigin(0.5).setDepth(3);
+        this.tweens.add({ targets: egg, scale: 1.15, duration: 500, yoyo: true, repeat: -1 });
+        this.tweens.add({ targets: r, alpha: 0.55, duration: 700, yoyo: true, repeat: -1 });
+        return [r, egg];
+      }
+      case 'pit': {
+        // The placer can see a faint dotted shadow.
+        const r = this.add.circle(x, y, TILE / 2 - 8, 0x000000, 0.18).setStrokeStyle(1, 0x222222, 0.5).setDepth(2);
+        return [r];
+      }
+      case 'tripwire': {
+        const r = this.add.rectangle(x, y, TILE - 4, TILE - 4, 0xff3030, 0.12).setDepth(2);
+        const line = this.add.rectangle(x, y, TILE - 4, 2, 0xff3030, 0.5).setDepth(3);
+        this.tweens.add({ targets: line, alpha: 0.15, duration: 600, yoyo: true, repeat: -1 });
+        return [r, line];
+      }
+      case 'tar': {
+        const r = this.add.rectangle(x, y, TILE - 4, TILE - 4, 0x222222, 0.85).setDepth(2);
+        const bubble1 = this.add.circle(x - 12, y + 6, 5, 0x000000, 0.7).setDepth(3);
+        const bubble2 = this.add.circle(x + 10, y - 8, 4, 0x000000, 0.7).setDepth(3);
+        this.tweens.add({ targets: bubble1, y: y - 4, duration: 700, yoyo: true, repeat: -1 });
+        this.tweens.add({ targets: bubble2, y: y + 4, duration: 900, yoyo: true, repeat: -1 });
+        return [r, bubble1, bubble2];
+      }
+      case 'magnet': {
+        const r = this.add.circle(x, y, TILE / 2 - 4, 0x7cd1ff, 0.0).setStrokeStyle(3, 0x7cd1ff, 0.7).setDepth(2);
+        const inner = this.add.circle(x, y, TILE / 4, 0x7cd1ff, 0.0).setStrokeStyle(2, 0x7cd1ff, 0.7).setDepth(2);
+        this.tweens.add({ targets: r, scale: 0.9, duration: 700, yoyo: true, repeat: -1 });
+        this.tweens.add({ targets: inner, scale: 1.4, alpha: 0, duration: 1000, repeat: -1 });
+        return [r, inner];
+      }
+      case 'black-hole': {
+        const r = this.add.circle(x, y, TILE / 2 - 2, 0x000000, 0.95).setDepth(3);
+        const ring = this.add.circle(x, y, TILE / 2 - 2, 0x9933ff, 0).setStrokeStyle(3, 0x9933ff, 0.8).setDepth(3);
+        this.tweens.add({ targets: ring, scale: 1.1, alpha: 0.3, duration: 600, yoyo: true, repeat: -1 });
+        return [r, ring];
+      }
+      case 'wormhole': {
+        const r = this.add.circle(x, y, TILE / 2 - 6, 0x9933ff, 0.5).setDepth(2);
+        const ring = this.add.circle(x, y, TILE / 2 - 6, 0xff5edb, 0).setStrokeStyle(3, 0xff5edb, 0.7).setDepth(3);
+        this.tweens.add({ targets: r, angle: 360, duration: 2000, repeat: -1 });
+        this.tweens.add({ targets: ring, scale: 1.2, alpha: 0.3, duration: 700, yoyo: true, repeat: -1 });
+        return [r, ring];
+      }
+      case 'acid': {
+        const r = this.add.rectangle(x, y, TILE - 4, TILE - 4, 0x7cff7a, 0.7).setDepth(2);
+        const drip = this.add.text(x, y, '🧪', { fontSize: '28px' }).setOrigin(0.5).setDepth(3);
+        this.tweens.add({ targets: r, alpha: 0.4, duration: 500, yoyo: true, repeat: -1 });
+        this.tweens.add({ targets: drip, y: y + 4, duration: 700, yoyo: true, repeat: -1 });
+        return [r, drip];
+      }
+      case 'cursed-square': {
+        const r = this.add.rectangle(x, y, TILE - 4, TILE - 4, 0x9933ff, 0.4).setDepth(2);
+        const rune = this.add.text(x, y, '⛧', { fontFamily: 'serif', fontSize: '36px', color: '#dd99ff' }).setOrigin(0.5).setDepth(3);
+        this.tweens.add({ targets: rune, alpha: 0.5, duration: 600, yoyo: true, repeat: -1 });
+        return [r, rune];
+      }
+      case 'holy-ground': {
+        const r = this.add.rectangle(x, y, TILE - 4, TILE - 4, 0xffffff, 0.5).setDepth(2);
+        const ring = this.add.circle(x, y, TILE / 2 - 6, 0xffd84d, 0).setStrokeStyle(2, 0xffd84d, 0.8).setDepth(3);
+        this.tweens.add({ targets: r, alpha: 0.25, duration: 800, yoyo: true, repeat: -1 });
+        this.tweens.add({ targets: ring, scale: 1.15, alpha: 0.3, duration: 1000, yoyo: true, repeat: -1 });
+        return [r, ring];
+      }
+      case 'pause-tile': {
+        const r = this.add.rectangle(x, y, TILE - 4, TILE - 4, 0x7cd1ff, 0.45).setStrokeStyle(2, 0xffffff, 0.6).setDepth(5);
+        const icon = this.add.text(x, y, '⏸', { fontFamily: 'serif', fontSize: '36px', color: '#ffffff' }).setOrigin(0.5).setDepth(5);
+        return [r, icon];
+      }
+      case 'quicksand': {
+        const r = this.add.rectangle(x, y, TILE - 4, TILE - 4, 0xc8a85a, 0.7).setDepth(2);
+        const swirl = this.add.text(x, y, '🌀', { fontSize: '32px' }).setOrigin(0.5).setDepth(3);
+        this.tweens.add({ targets: swirl, angle: 360, duration: 2500, repeat: -1 });
+        return [r, swirl];
       }
       default:
         return [];
@@ -300,31 +385,102 @@ export class BoardScene extends Phaser.Scene {
   drawPieceEffect(sq, effect) {
     const x = squareX(sq, this.myColor);
     const y = squareY(sq, this.myColor);
+    const cornerX = x + TILE / 3;
+    const cornerY = y - TILE / 3;
     switch (effect.type) {
       case 'bomb': {
-        const t = this.add.text(x + TILE / 3, y - TILE / 3, '💣', { fontSize: '20px' }).setOrigin(0.5).setDepth(15);
+        const t = this.add.text(cornerX, cornerY, '💣', { fontSize: '22px' }).setOrigin(0.5).setDepth(15);
         this.tweens.add({ targets: t, scale: 1.2, duration: 400, yoyo: true, repeat: -1 });
         return [t];
       }
       case 'frozen': {
-        const t = this.add.text(x + TILE / 3, y - TILE / 3, '❄', { fontSize: '20px', color: '#7cd1ff' }).setOrigin(0.5).setDepth(15);
-        return [t];
+        const ring = this.add.circle(x, y, TILE / 2 - 4, 0x7cd1ff, 0.18).setStrokeStyle(2, 0x7cd1ff, 0.7).setDepth(11);
+        const t = this.add.text(cornerX, cornerY, '❄', { fontSize: '22px', color: '#7cd1ff' }).setOrigin(0.5).setDepth(15);
+        return [ring, t];
       }
       case 'cursed': {
-        const t = this.add.text(x + TILE / 3, y - TILE / 3, '☠', { fontSize: '20px', color: '#9933ff' }).setOrigin(0.5).setDepth(15);
-        return [t];
+        const ring = this.add.circle(x, y, TILE / 2 - 4, 0x9933ff, 0.0).setStrokeStyle(2, 0x9933ff, 0.7).setDepth(11);
+        const t = this.add.text(cornerX, cornerY, '☠', { fontSize: '22px', color: '#9933ff' }).setOrigin(0.5).setDepth(15);
+        this.tweens.add({ targets: ring, alpha: 0.6, duration: 600, yoyo: true, repeat: -1 });
+        return [ring, t];
       }
       case 'speed-demon':
       case 'berserker':
       case 'power-surge': {
         const c = this.add.circle(x, y, TILE / 2 - 4, 0xffd84d, 0.0).setStrokeStyle(2, 0xffd84d).setDepth(11);
+        const bolt = this.add.text(cornerX, cornerY, '⚡', { fontSize: '20px', color: '#ffd84d' }).setOrigin(0.5).setDepth(15);
         this.tweens.add({ targets: c, alpha: 0.7, duration: 600, yoyo: true, repeat: -1 });
-        return [c];
+        return [c, bolt];
       }
       case 'suicide-pawn': {
         const c = this.add.circle(x, y, TILE / 2 - 4, 0xff3030, 0.0).setStrokeStyle(2, 0xff3030).setDepth(11);
+        const t = this.add.text(cornerX, cornerY, '💥', { fontSize: '20px' }).setOrigin(0.5).setDepth(15);
         this.tweens.add({ targets: c, alpha: 0.6, duration: 400, yoyo: true, repeat: -1 });
-        return [c];
+        return [c, t];
+      }
+      case 'phantom': {
+        const aura = this.add.circle(x, y, TILE / 2 - 4, 0x7cd1ff, 0.25).setDepth(9);
+        const ghost = this.add.text(cornerX, cornerY, '👻', { fontSize: '22px' }).setOrigin(0.5).setDepth(15);
+        this.tweens.add({ targets: aura, alpha: 0.05, duration: 800, yoyo: true, repeat: -1 });
+        return [aura, ghost];
+      }
+      case 'heir':
+      case 'pawn-king': {
+        const t = this.add.text(x, y - TILE / 2 + 6, '👑', { fontSize: '22px' }).setOrigin(0.5).setDepth(15);
+        this.tweens.add({ targets: t, y: y - TILE / 2 + 2, duration: 600, yoyo: true, repeat: -1 });
+        return [t];
+      }
+      case 'royal-marriage': {
+        const t = this.add.text(x, y - TILE / 2 + 8, '👑', { fontSize: '24px' }).setOrigin(0.5).setDepth(15);
+        const ring = this.add.circle(x, y, TILE / 2 - 4, 0xff5edb, 0).setStrokeStyle(2, 0xff5edb, 0.7).setDepth(11);
+        this.tweens.add({ targets: ring, alpha: 0.5, duration: 700, yoyo: true, repeat: -1 });
+        return [t, ring];
+      }
+      case 'mercenary': {
+        const t = this.add.text(cornerX, cornerY, '🪙', { fontSize: '20px' }).setOrigin(0.5).setDepth(15);
+        const ring = this.add.circle(x, y, TILE / 2 - 4, 0xffd84d, 0).setStrokeStyle(2, 0xffd84d, 0.5).setDepth(11);
+        this.tweens.add({ targets: ring, alpha: 0.35, duration: 800, yoyo: true, repeat: -1 });
+        return [t, ring];
+      }
+      case 'iron-rook':
+      case 'iron-skin': {
+        const ring = this.add.rectangle(x, y, TILE - 6, TILE - 6, 0x999999, 0).setStrokeStyle(3, 0xaaaaaa, 0.8).setDepth(11);
+        const icon = this.add.text(cornerX, cornerY, '🛡', { fontSize: '20px' }).setOrigin(0.5).setDepth(15);
+        return [ring, icon];
+      }
+      case 'decoy-king': {
+        // Tiny crown only the placer should reasonably trust; everyone sees the same here for v1.
+        const t = this.add.text(cornerX, cornerY, '🎭', { fontSize: '20px' }).setOrigin(0.5).setDepth(15);
+        return [t];
+      }
+      case 'disguise': {
+        const t = this.add.text(cornerX, cornerY, '?', { fontFamily: '"Press Start 2P", monospace', fontSize: '20px', color: '#ffd84d' })
+          .setOrigin(0.5).setDepth(15);
+        this.tweens.add({ targets: t, alpha: 0.4, duration: 500, yoyo: true, repeat: -1 });
+        return [t];
+      }
+      case 'plague': {
+        const aura = this.add.circle(x, y, TILE / 2 - 4, 0x7cff7a, 0.25).setDepth(11);
+        const fly = this.add.text(cornerX, cornerY, '🦟', { fontSize: '20px' }).setOrigin(0.5).setDepth(15);
+        this.tweens.add({ targets: aura, alpha: 0.05, duration: 600, yoyo: true, repeat: -1 });
+        this.tweens.add({ targets: fly, x: cornerX + 4, duration: 400, yoyo: true, repeat: -1 });
+        return [aura, fly];
+      }
+      case 'berserker-pawn': {
+        const eyes = this.add.text(cornerX, cornerY, '😡', { fontSize: '20px' }).setOrigin(0.5).setDepth(15);
+        const ring = this.add.circle(x, y, TILE / 2 - 4, 0xff3030, 0).setStrokeStyle(2, 0xff3030, 0.7).setDepth(11);
+        this.tweens.add({ targets: ring, alpha: 0.5, duration: 350, yoyo: true, repeat: -1 });
+        return [eyes, ring];
+      }
+      case 'trojan': {
+        const horse = this.add.text(cornerX, cornerY, '🐴', { fontSize: '20px' }).setOrigin(0.5).setDepth(15);
+        return [horse];
+      }
+      case 'chrono-lock': {
+        const ring = this.add.circle(x, y, TILE / 2 - 4, 0x7cd1ff, 0).setStrokeStyle(2, 0x7cd1ff, 0.7).setDepth(11);
+        const clock = this.add.text(cornerX, cornerY, '⏱', { fontSize: '20px', color: '#7cd1ff' }).setOrigin(0.5).setDepth(15);
+        this.tweens.add({ targets: ring, angle: 360, duration: 2500, repeat: -1 });
+        return [ring, clock];
       }
       default:
         return [];
@@ -355,21 +511,9 @@ export class BoardScene extends Phaser.Scene {
         const x = squareX(e.center, this.myColor);
         const y = squareY(e.center, this.myColor);
         const c = this.add.circle(x, y, 4, 0xff5e3a, 1).setDepth(20);
-        this.tweens.add({
-          targets: c,
-          radius: TILE * (1 + (e.radius || 0)),
-          alpha: 0,
-          duration: 500,
-          onComplete: () => c.destroy(),
-        });
+        this.tweens.add({ targets: c, radius: TILE * (1 + (e.radius || 0)), alpha: 0, duration: 500, onComplete: () => c.destroy() });
         const ring = this.add.circle(x, y, TILE / 2, 0xffd84d, 0).setStrokeStyle(3, 0xffd84d).setDepth(20);
-        this.tweens.add({
-          targets: ring,
-          scale: 2 + (e.radius || 0),
-          alpha: 0,
-          duration: 500,
-          onComplete: () => ring.destroy(),
-        });
+        this.tweens.add({ targets: ring, scale: 2 + (e.radius || 0), alpha: 0, duration: 500, onComplete: () => ring.destroy() });
         this.cameras.main.shake(200, 0.005);
         break;
       }
@@ -378,6 +522,28 @@ export class BoardScene extends Phaser.Scene {
         const y = squareY(e.square, this.myColor);
         const puff = this.add.circle(x, y, TILE / 3, 0x666666, 0.7).setDepth(20);
         this.tweens.add({ targets: puff, scale: 1.5, alpha: 0, duration: 400, onComplete: () => puff.destroy() });
+        break;
+      }
+      case 'pieces-spawned': {
+        // Used for spawn rules and dragon hatch.
+        for (const sq of e.squares || []) {
+          const x = squareX(sq, this.myColor);
+          const y = squareY(sq, this.myColor);
+          const flash = this.add.circle(x, y, TILE * 0.6, 0xffd84d, 0.7).setDepth(19);
+          this.tweens.add({ targets: flash, scale: 1.3, alpha: 0, duration: 600, onComplete: () => flash.destroy() });
+          for (let i = 0; i < 8; i++) {
+            const angle = (Math.PI * 2 * i) / 8;
+            const star = this.add.text(x, y, '✦', { fontSize: '14px', color: '#ffd84d' }).setOrigin(0.5).setDepth(19);
+            this.tweens.add({
+              targets: star,
+              x: x + Math.cos(angle) * TILE * 0.6,
+              y: y + Math.sin(angle) * TILE * 0.6,
+              alpha: 0,
+              duration: 700,
+              onComplete: () => star.destroy(),
+            });
+          }
+        }
         break;
       }
       case 'lightning-strike': {
@@ -389,16 +555,19 @@ export class BoardScene extends Phaser.Scene {
         break;
       }
       case 'rule-activated': {
+        const category = e.rule?.category || 'Wild';
+        const tint = CATEGORY_TINT[category] || 0xffd84d;
         const w = this.cameras.main.width;
         const h = this.cameras.main.height;
-        const banner = this.add.rectangle(w / 2, h / 2, 600, 80, 0x1a1033, 0.95).setStrokeStyle(3, 0xffd84d).setDepth(100);
-        const txt = this.add.text(w / 2, h / 2, e.rule?.name || 'CHAOS', {
-          fontFamily: '"Press Start 2P", monospace',
-          fontSize: '28px',
-          color: '#ffd84d',
+        const banner = this.add.rectangle(w / 2, h / 2, 620, 90, 0x0d0a1f, 0.95).setStrokeStyle(4, tint).setDepth(100);
+        const cat = this.add.text(w / 2, h / 2 - 22, category.toUpperCase(), {
+          fontFamily: '"Press Start 2P", monospace', fontSize: '12px', color: hexCss(tint),
         }).setOrigin(0.5).setDepth(101);
-        this.tweens.add({ targets: [banner, txt], alpha: 0, duration: 400, delay: 1300, onComplete: () => { banner.destroy(); txt.destroy(); } });
-        this.cameras.main.flash(150, 255, 255, 255);
+        const txt = this.add.text(w / 2, h / 2 + 8, e.rule?.name || 'CHAOS', {
+          fontFamily: '"Press Start 2P", monospace', fontSize: '24px', color: '#ffffff',
+        }).setOrigin(0.5).setDepth(101);
+        this.tweens.add({ targets: [banner, cat, txt], alpha: 0, duration: 400, delay: 1400, onComplete: () => { banner.destroy(); cat.destroy(); txt.destroy(); } });
+        this.cameras.main.flash(150, (tint >> 16) & 0xff, (tint >> 8) & 0xff, tint & 0xff);
         break;
       }
       case 'apocalypse': {
@@ -406,8 +575,301 @@ export class BoardScene extends Phaser.Scene {
         this.cameras.main.flash(800, 255, 80, 80);
         break;
       }
+      case 'mind-control':
+      case 'possession': {
+        if (e.from && e.to) this.flashLink(e.from, e.to, 0x9933ff);
+        break;
+      }
+      case 'mind-swap': {
+        if (e.a && e.b) {
+          this.flashLink(e.a, e.b, 0xff5edb);
+          this.flashLink(e.b, e.a, 0xff5edb);
+        }
+        break;
+      }
+      case 'piece-defected': {
+        const x = squareX(e.square, this.myColor);
+        const y = squareY(e.square, this.myColor);
+        const flag = this.add.text(x, y - TILE, '🏳', { fontSize: '40px' }).setOrigin(0.5).setDepth(21);
+        this.tweens.add({ targets: flag, y, alpha: 0, duration: 600, onComplete: () => flag.destroy() });
+        break;
+      }
+      case 'dream-walk': {
+        if (e.from) {
+          const x = squareX(e.from, this.myColor);
+          const y = squareY(e.from, this.myColor);
+          for (let i = 0; i < 12; i++) {
+            const star = this.add.text(x, y, '✦', { fontSize: '16px', color: '#7cd1ff' }).setOrigin(0.5).setDepth(21);
+            const dx = (Math.random() - 0.5) * TILE * 1.4;
+            const dy = (Math.random() - 0.5) * TILE * 1.4;
+            this.tweens.add({ targets: star, x: x + dx, y: y + dy, alpha: 0, duration: 700, onComplete: () => star.destroy() });
+          }
+        }
+        if (e.to) this.flashTile(e.to, 0x7cd1ff);
+        break;
+      }
+      case 'dance-step': {
+        if (e.to) {
+          const x = squareX(e.to, this.myColor);
+          const y = squareY(e.to, this.myColor);
+          const note = this.add.text(x, y - TILE / 2, '🎵', { fontSize: '28px' }).setOrigin(0.5).setDepth(21);
+          this.tweens.add({ targets: note, y: y - TILE, alpha: 0, duration: 700, onComplete: () => note.destroy() });
+        }
+        break;
+      }
+      case 'plague-spread': {
+        if (e.from && e.to) this.flashLink(e.from, e.to, 0x7cff7a);
+        break;
+      }
+      case 'magnetic-pull':
+      case 'magnetic-shift': {
+        if (e.square) this.flashTile(e.square, 0x7cd1ff);
+        if (e.from && e.to) this.flashLink(e.from, e.to, 0x7cd1ff);
+        break;
+      }
+      case 'wormhole-traversed': {
+        if (e.from) this.flashTile(e.from, 0x9933ff);
+        if (e.to) this.flashTile(e.to, 0x9933ff);
+        break;
+      }
+      case 'black-hole-devour': {
+        if (e.square) {
+          const x = squareX(e.square, this.myColor);
+          const y = squareY(e.square, this.myColor);
+          const v = this.add.circle(x, y, TILE / 3, 0x000000, 0.9).setDepth(21);
+          this.tweens.add({ targets: v, scale: 0.05, alpha: 0, duration: 500, onComplete: () => v.destroy() });
+        }
+        break;
+      }
+      case 'pit-triggered': {
+        if (e.square) {
+          const x = squareX(e.square, this.myColor);
+          const y = squareY(e.square, this.myColor);
+          const dust = this.add.circle(x, y, TILE / 3, 0x553311, 0.7).setDepth(21);
+          this.tweens.add({ targets: dust, scale: 1.6, alpha: 0, duration: 500, onComplete: () => dust.destroy() });
+        }
+        break;
+      }
+      case 'tripwire-triggered': {
+        if (e.square) {
+          const x = squareX(e.square, this.myColor);
+          const y = squareY(e.square, this.myColor);
+          const beam = this.add.rectangle(0, y, this.cameras.main.width, 4, 0xff3030, 1).setDepth(21);
+          this.tweens.add({ targets: beam, alpha: 0, duration: 400, onComplete: () => beam.destroy() });
+          this.cameras.main.flash(120, 255, 80, 80);
+        }
+        break;
+      }
+      case 'spike-trap-triggered': {
+        for (const sq of e.tiles || []) this.flashTile(sq, 0xff3030);
+        this.cameras.main.shake(150, 0.008);
+        break;
+      }
+      case 'time-warp':
+      case 'groundhog-day': {
+        const w = this.cameras.main.width;
+        const h = this.cameras.main.height;
+        const txt = this.add.text(w / 2, h / 2, '⟲', { fontSize: '120px', color: '#a78bfa' }).setOrigin(0.5).setDepth(50);
+        this.tweens.add({ targets: txt, angle: -360, alpha: 0, duration: 800, onComplete: () => txt.destroy() });
+        break;
+      }
+      case 'fast-forward': {
+        const w = this.cameras.main.width;
+        const h = this.cameras.main.height;
+        const txt = this.add.text(w / 2, h / 2, '⟳⟳⟳', { fontSize: '64px', color: '#a78bfa' }).setOrigin(0.5).setDepth(50);
+        this.tweens.add({ targets: txt, alpha: 0, duration: 700, onComplete: () => txt.destroy() });
+        break;
+      }
+      case 'mirror-flipped': {
+        this.cameras.main.flash(150, 200, 200, 255);
+        break;
+      }
+      case 'reverse-gravity':
+      case 'hurricane':
+      case 'tsunami-wave': {
+        this.cameras.main.shake(250, 0.006);
+        break;
+      }
+      case 'tsunami-warning': {
+        const w = this.cameras.main.width;
+        const h = this.cameras.main.height;
+        const txt = this.add.text(w / 2, 60, '🌊 TSUNAMI INCOMING 🌊', {
+          fontFamily: '"Press Start 2P", monospace', fontSize: '14px', color: '#7cd1ff',
+        }).setOrigin(0.5).setDepth(50);
+        this.tweens.add({ targets: txt, alpha: 0, duration: 600, delay: 1200, onComplete: () => txt.destroy() });
+        break;
+      }
+      case 'earthquake-shift':
+      case 'hurricane-shift': {
+        if (e.from && e.to) this.flashLink(e.from, e.to, 0xc8a85a);
+        break;
+      }
+      case 'holy-resurrect':
+      case 'heir-crowned': {
+        if (e.square) {
+          const x = squareX(e.square, this.myColor);
+          const y = squareY(e.square, this.myColor);
+          const beam = this.add.rectangle(x, y - 200, TILE * 0.7, 400, 0xffffff, 0.6).setDepth(19);
+          this.tweens.add({ targets: beam, alpha: 0, duration: 800, onComplete: () => beam.destroy() });
+          for (let i = 0; i < 12; i++) {
+            const star = this.add.text(x, y, '✦', { fontSize: '14px', color: '#ffd84d' }).setOrigin(0.5).setDepth(20);
+            const angle = (Math.PI * 2 * i) / 12;
+            this.tweens.add({
+              targets: star,
+              x: x + Math.cos(angle) * TILE * 0.7,
+              y: y + Math.sin(angle) * TILE * 0.7,
+              alpha: 0, duration: 800,
+              onComplete: () => star.destroy(),
+            });
+          }
+        }
+        break;
+      }
+      case 'iron-rook-saved':
+      case 'iron-skin-saved': {
+        if (e.square) {
+          const x = squareX(e.square, this.myColor);
+          const y = squareY(e.square, this.myColor);
+          const sparks = this.add.text(x, y, '✦', { fontSize: '40px', color: '#bbbbbb' }).setOrigin(0.5).setDepth(20);
+          this.tweens.add({ targets: sparks, scale: 1.6, alpha: 0, duration: 500, onComplete: () => sparks.destroy() });
+        }
+        break;
+      }
+      case 'vampire-feed': {
+        if (e.square) {
+          const x = squareX(e.square, this.myColor);
+          const y = squareY(e.square, this.myColor);
+          for (let i = 0; i < 6; i++) {
+            const drop = this.add.text(x, y, '·', { fontSize: '24px', color: '#ff3030' }).setOrigin(0.5).setDepth(20);
+            this.tweens.add({ targets: drop, x: x + (Math.random() - 0.5) * TILE, y: y + TILE / 2, alpha: 0, duration: 600, onComplete: () => drop.destroy() });
+          }
+        }
+        break;
+      }
+      case 'coin-flip': {
+        const w = this.cameras.main.width;
+        const h = this.cameras.main.height;
+        const coin = this.add.text(w / 2, h / 2, '🪙', { fontSize: '80px' }).setOrigin(0.5).setDepth(50);
+        this.tweens.add({ targets: coin, scaleY: -1, duration: 500, yoyo: true, repeat: 1 });
+        this.tweens.add({ targets: coin, alpha: 0, delay: 1200, duration: 400, onComplete: () => coin.destroy() });
+        break;
+      }
+      case 'roulette': {
+        for (const sq of e.candidates || []) this.flashTile(sq, 0xff3030);
+        if (e.victim) {
+          const x = squareX(e.victim, this.myColor);
+          const y = squareY(e.victim, this.myColor);
+          const skull = this.add.text(x, y, '☠', { fontSize: '60px', color: '#ff3030' }).setOrigin(0.5).setDepth(21);
+          this.tweens.add({ targets: skull, alpha: 0, scale: 1.5, duration: 700, onComplete: () => skull.destroy() });
+        }
+        break;
+      }
+      case 'doomsday-strike':
+      case 'cursed-strike': {
+        if (e.square) {
+          const x = squareX(e.square, this.myColor);
+          const y = squareY(e.square, this.myColor);
+          const raven = this.add.text(x, y - TILE * 1.2, '🦅', { fontSize: '40px' }).setOrigin(0.5).setDepth(21);
+          this.tweens.add({ targets: raven, y, alpha: 0, duration: 600, onComplete: () => raven.destroy() });
+        }
+        break;
+      }
+      case 'cluster-marked':
+      case 'mines-placed': {
+        for (const sq of e.tiles || []) this.flashTile(sq, 0xff3030);
+        break;
+      }
+      case 'lava-tiles':
+      case 'walls-built':
+      case 'volcano-warning':
+      case 'mine-placed':
+      case 'pit-placed':
+      case 'tripwire-set':
+      case 'tar-pit-set':
+      case 'cursed-square-set':
+      case 'pause-tile-set':
+      case 'holy-ground-set':
+      case 'doomsday-tile-marked':
+      case 'royal-recruit-marked':
+      case 'dragon-egg-laid':
+      case 'quicksand-tiles':
+      case 'acid-pool':
+      case 'black-hole-opened':
+      case 'wormhole-set': {
+        // tile-effect placement events: ping the squares for visibility
+        const tiles = e.tiles || (e.square ? [e.square] : []);
+        for (const sq of tiles) this.flashTile(sq, 0xffd84d);
+        break;
+      }
+      case 'lava-burn': {
+        if (e.square) {
+          const x = squareX(e.square, this.myColor);
+          const y = squareY(e.square, this.myColor);
+          const fire = this.add.text(x, y, '🔥', { fontSize: '40px' }).setOrigin(0.5).setDepth(21);
+          this.tweens.add({ targets: fire, alpha: 0, scale: 1.4, duration: 500, onComplete: () => fire.destroy() });
+        }
+        break;
+      }
+      case 'turn-skipped': {
+        const w = this.cameras.main.width;
+        const h = this.cameras.main.height;
+        const txt = this.add.text(w / 2, h / 2, 'TURN SKIPPED', {
+          fontFamily: '"Press Start 2P", monospace', fontSize: '24px', color: '#7cd1ff',
+        }).setOrigin(0.5).setDepth(50);
+        this.tweens.add({ targets: txt, alpha: 0, duration: 600, delay: 700, onComplete: () => txt.destroy() });
+        break;
+      }
+      case 'extra-turn-active': {
+        const w = this.cameras.main.width;
+        const txt = this.add.text(w / 2, 60, 'EXTRA TURN', {
+          fontFamily: '"Press Start 2P", monospace', fontSize: '14px', color: '#ffd84d',
+        }).setOrigin(0.5).setDepth(50);
+        this.tweens.add({ targets: txt, alpha: 0, duration: 600, delay: 800, onComplete: () => txt.destroy() });
+        break;
+      }
+      case 'plague-start': {
+        if (e.square) this.flashTile(e.square, 0x7cff7a);
+        break;
+      }
     }
   }
+
+  // Brief tile flash for highlights.
+  flashTile(sq, color) {
+    const x = squareX(sq, this.myColor);
+    const y = squareY(sq, this.myColor);
+    const r = this.add.rectangle(x, y, TILE, TILE, color, 0.6).setDepth(19);
+    this.tweens.add({ targets: r, alpha: 0, duration: 600, onComplete: () => r.destroy() });
+  }
+
+  // Draw a brief animated link between two squares.
+  flashLink(fromSq, toSq, color) {
+    const x1 = squareX(fromSq, this.myColor);
+    const y1 = squareY(fromSq, this.myColor);
+    const x2 = squareX(toSq, this.myColor);
+    const y2 = squareY(toSq, this.myColor);
+    const seed = this.add.circle(x1, y1, 8, color, 0.9).setDepth(21);
+    this.tweens.add({ targets: seed, x: x2, y: y2, alpha: 0.2, scale: 1.5, duration: 500, onComplete: () => seed.destroy() });
+    this.flashTile(fromSq, color);
+    this.flashTile(toSq, color);
+  }
+}
+
+const CATEGORY_TINT = {
+  Explosive: 0xff5e3a,
+  Summoning: 0x7cff7a,
+  Movement:  0x7cd1ff,
+  Time:      0xa78bfa,
+  Transform: 0xffd84d,
+  Weather:   0xa6e3ff,
+  Mind:      0x9933ff,
+  Trap:      0xff3030,
+  Buff:      0xffd84d,
+  Wild:      0xf0e8d8,
+};
+
+function hexCss(num) {
+  return '#' + num.toString(16).padStart(6, '0');
 }
 
 function parseFEN(fen) {
