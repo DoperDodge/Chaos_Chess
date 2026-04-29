@@ -31,6 +31,7 @@ export class BoardScene extends Phaser.Scene {
     this.fromSquare = null;
     this.lastMoveHighlights = [];
     this.moveMarkers = [];        // legal-move dots/rings for the selected piece
+    this.boardOverlays = {};      // ruleId -> [sprites] for persistent board-wide effects
     this.state = null;
     this.myColor = 'white';
     this.created = false;
@@ -191,6 +192,7 @@ export class BoardScene extends Phaser.Scene {
     this.renderTileEffects();
     this.renderPieceEffects();
     this.renderLastMoveHighlight();
+    this.renderBoardOverlays();
   }
 
   renderPieces() {
@@ -497,6 +499,135 @@ export class BoardScene extends Phaser.Scene {
       const y = squareY(sq, this.myColor);
       const r = this.add.rectangle(x, y, TILE, TILE, LAST_MOVE, 0.45).setDepth(0.5);
       this.lastMoveHighlights.push(r);
+    }
+  }
+
+  // Renders persistent board-wide overlays for global rules — Pacman Board's
+  // edge glow, Icy Board's particle field, Sandstorm's haze, etc. Each rule is
+  // keyed by its instanceId; expired rules clean up automatically.
+  renderBoardOverlays() {
+    const active = this.state?.activeRules || [];
+    const activeIds = new Set(active.map(r => r.instanceId));
+    // Tear down overlays whose rules are gone
+    for (const id of Object.keys(this.boardOverlays)) {
+      if (!activeIds.has(Number(id))) {
+        this.boardOverlays[id].forEach(s => s.destroy());
+        delete this.boardOverlays[id];
+      }
+    }
+    // Spin up new overlays for newly-active rules
+    for (const r of active) {
+      if (this.boardOverlays[r.instanceId]) continue;
+      const sprites = this.buildBoardOverlay(r);
+      if (sprites?.length) this.boardOverlays[r.instanceId] = sprites;
+    }
+  }
+
+  buildBoardOverlay(rule) {
+    const cx = ORIGIN_X + BOARD_PX / 2;
+    const cy = ORIGIN_Y + BOARD_PX / 2;
+    switch (rule.ruleId) {
+      case 21: { // Pacman Board — pulsing yellow border
+        const top = this.add.rectangle(cx, ORIGIN_Y, BOARD_PX, 4, 0xffd84d, 0.7).setDepth(0.8);
+        const bot = this.add.rectangle(cx, ORIGIN_Y + BOARD_PX, BOARD_PX, 4, 0xffd84d, 0.7).setDepth(0.8);
+        const left = this.add.rectangle(ORIGIN_X, cy, 4, BOARD_PX, 0xffd84d, 0.7).setDepth(0.8);
+        const right = this.add.rectangle(ORIGIN_X + BOARD_PX, cy, 4, BOARD_PX, 0xffd84d, 0.7).setDepth(0.8);
+        for (const s of [top, bot, left, right]) {
+          this.tweens.add({ targets: s, alpha: 0.3, duration: 700, yoyo: true, repeat: -1 });
+        }
+        return [top, bot, left, right];
+      }
+      case 24: { // Slippery Floor — light blue sheen
+        const r = this.add.rectangle(cx, cy, BOARD_PX, BOARD_PX, 0x7cd1ff, 0.07).setDepth(0.6);
+        this.tweens.add({ targets: r, alpha: 0.18, duration: 1500, yoyo: true, repeat: -1 });
+        return [r];
+      }
+      case 51: { // Icy Board — blue overlay + drifting snowflakes
+        const tint = this.add.rectangle(cx, cy, BOARD_PX, BOARD_PX, 0x7cd1ff, 0.12).setDepth(0.6);
+        const flakes = [];
+        for (let i = 0; i < 14; i++) {
+          const f = this.add.text(
+            ORIGIN_X + Math.random() * BOARD_PX,
+            ORIGIN_Y + Math.random() * BOARD_PX,
+            '❄', { fontSize: `${10 + Math.random() * 10}px`, color: '#ffffff' }
+          ).setOrigin(0.5).setAlpha(0.7).setDepth(0.7);
+          this.tweens.add({
+            targets: f, y: f.y + BOARD_PX, x: f.x + (Math.random() - 0.5) * 40,
+            duration: 4000 + Math.random() * 4000, repeat: -1,
+            onRepeat: () => { f.x = ORIGIN_X + Math.random() * BOARD_PX; f.y = ORIGIN_Y; },
+          });
+          flakes.push(f);
+        }
+        return [tint, ...flakes];
+      }
+      case 58: { // Aurora — shifting green/pink overlay
+        const a = this.add.rectangle(cx, cy, BOARD_PX, BOARD_PX, 0x7cff7a, 0.14).setDepth(0.6);
+        const b = this.add.rectangle(cx, cy, BOARD_PX, BOARD_PX, 0xff5edb, 0.10).setDepth(0.6);
+        this.tweens.add({ targets: a, alpha: 0.04, duration: 2400, yoyo: true, repeat: -1 });
+        this.tweens.add({ targets: b, alpha: 0.20, duration: 2400, yoyo: true, repeat: -1, delay: 1200 });
+        return [a, b];
+      }
+      case 59: { // Sandstorm — golden haze + drifting sand
+        const haze = this.add.rectangle(cx, cy, BOARD_PX, BOARD_PX, 0xc8a85a, 0.35).setDepth(8);
+        const grains = [];
+        for (let i = 0; i < 20; i++) {
+          const g = this.add.circle(
+            ORIGIN_X + Math.random() * BOARD_PX,
+            ORIGIN_Y + Math.random() * BOARD_PX,
+            2, 0xe5d4a0, 0.6
+          ).setDepth(8);
+          this.tweens.add({
+            targets: g, x: g.x + BOARD_PX,
+            duration: 2000 + Math.random() * 1500, repeat: -1,
+            onRepeat: () => { g.x = ORIGIN_X; g.y = ORIGIN_Y + Math.random() * BOARD_PX; },
+          });
+          grains.push(g);
+        }
+        return [haze, ...grains];
+      }
+      case 60: { // Snow Day — gentle drifting flakes
+        const flakes = [];
+        for (let i = 0; i < 18; i++) {
+          const f = this.add.text(
+            ORIGIN_X + Math.random() * BOARD_PX,
+            ORIGIN_Y + Math.random() * BOARD_PX,
+            '❄', { fontSize: '12px', color: '#ffffff' }
+          ).setOrigin(0.5).setAlpha(0.6).setDepth(0.7);
+          this.tweens.add({
+            targets: f, y: f.y + BOARD_PX,
+            duration: 5000 + Math.random() * 4000, repeat: -1,
+            onRepeat: () => { f.x = ORIGIN_X + Math.random() * BOARD_PX; f.y = ORIGIN_Y; },
+          });
+          flakes.push(f);
+        }
+        return flakes;
+      }
+      case 68: { // Fog of War — gray overlay
+        const fog = this.add.rectangle(cx, cy, BOARD_PX, BOARD_PX, 0x222233, 0.65).setDepth(8);
+        return [fog];
+      }
+      case 99: { // Truce — peace banner
+        const dove = this.add.text(cx, ORIGIN_Y - 8, '🕊  TRUCE  🕊', {
+          fontFamily: '"Press Start 2P", monospace', fontSize: '12px', color: '#f0e8d8',
+        }).setOrigin(0.5, 1).setDepth(50);
+        const overlay = this.add.rectangle(cx, cy, BOARD_PX, BOARD_PX, 0xffffff, 0.06).setDepth(0.6);
+        this.tweens.add({ targets: overlay, alpha: 0.12, duration: 1500, yoyo: true, repeat: -1 });
+        return [dove, overlay];
+      }
+      case 22: { // Mirror Board — subtle pulsing edges
+        const left = this.add.rectangle(ORIGIN_X, cy, 4, BOARD_PX, 0xff5edb, 0.5).setDepth(0.8);
+        const right = this.add.rectangle(ORIGIN_X + BOARD_PX, cy, 4, BOARD_PX, 0xff5edb, 0.5).setDepth(0.8);
+        for (const s of [left, right]) {
+          this.tweens.add({ targets: s, alpha: 0.15, duration: 1000, yoyo: true, repeat: -1 });
+        }
+        return [left, right];
+      }
+      case 69: { // Nightmare — translucent dark curtain at top of board
+        const curtain = this.add.rectangle(cx, ORIGIN_Y + BOARD_PX / 4, BOARD_PX, BOARD_PX / 2, 0x0d0a1f, 0.25).setDepth(7);
+        return [curtain];
+      }
+      default:
+        return [];
     }
   }
 
@@ -829,6 +960,74 @@ export class BoardScene extends Phaser.Scene {
       }
       case 'plague-start': {
         if (e.square) this.flashTile(e.square, 0x7cff7a);
+        break;
+      }
+      case 'rule-cancelled': {
+        const w = this.cameras.main.width;
+        const h = this.cameras.main.height;
+        const x = w / 2 + (Math.random() - 0.5) * 40;
+        const y = h / 2 + (Math.random() - 0.5) * 40;
+        const t = this.add.text(x, y, '✕', { fontFamily: 'serif', fontSize: '64px', color: '#ff3030' }).setOrigin(0.5).setDepth(50);
+        this.tweens.add({ targets: t, alpha: 0, scale: 1.6, duration: 600, onComplete: () => t.destroy() });
+        break;
+      }
+      case 'lucky-protected': {
+        if (e.square) {
+          const x = squareX(e.square, this.myColor);
+          const y = squareY(e.square, this.myColor);
+          const t = this.add.text(x, y, '🍀', { fontSize: '32px' }).setOrigin(0.5).setDepth(20);
+          this.tweens.add({ targets: t, y: y - 40, alpha: 0, duration: 700, onComplete: () => t.destroy() });
+        }
+        break;
+      }
+      case 'acid-tick': {
+        if (e.square) {
+          const x = squareX(e.square, this.myColor);
+          const y = squareY(e.square, this.myColor);
+          const drop = this.add.text(x, y, '·', { fontSize: '28px', color: '#7cff7a' }).setOrigin(0.5).setDepth(20);
+          this.tweens.add({ targets: drop, y: y + 8, alpha: 0, duration: 500, onComplete: () => drop.destroy() });
+        }
+        break;
+      }
+      case 'knight-errant-used': {
+        const w = this.cameras.main.width;
+        const txt = this.add.text(w / 2, 60, 'KNIGHT ERRANT', {
+          fontFamily: '"Press Start 2P", monospace', fontSize: '14px', color: '#ffd84d',
+        }).setOrigin(0.5).setDepth(50);
+        this.tweens.add({ targets: txt, alpha: 0, duration: 600, delay: 700, onComplete: () => txt.destroy() });
+        break;
+      }
+      case 'extra-turn-granted': {
+        // Picker just earned an extra turn — tiny celebratory burst
+        const w = this.cameras.main.width;
+        const txt = this.add.text(w / 2, 60, '+1 TURN', {
+          fontFamily: '"Press Start 2P", monospace', fontSize: '14px', color: '#ffd84d',
+        }).setOrigin(0.5).setDepth(50);
+        this.tweens.add({ targets: txt, alpha: 0, duration: 600, delay: 700, onComplete: () => txt.destroy() });
+        break;
+      }
+      case 'bomb-attached':
+      case 'heir-tagged':
+      case 'trojan-placed':
+      case 'decoy-king-set':
+      case 'disguise-set':
+      case 'piece-buffed':
+      case 'piece-cursed':
+      case 'piece-frozen':
+      case 'piece-locked': {
+        if (e.square) this.flashTile(e.square, 0xffd84d);
+        break;
+      }
+      case 'grenade-thrown': {
+        for (const sq of e.tiles || []) this.flashTile(sq, 0xff5e3a);
+        break;
+      }
+      case 'wild-card-rolled': {
+        const w = this.cameras.main.width;
+        const txt = this.add.text(w / 2, 60, `🎲 ${e.name || 'WILD CARD'} 🎲`, {
+          fontFamily: '"Press Start 2P", monospace', fontSize: '12px', color: '#f0e8d8',
+        }).setOrigin(0.5).setDepth(50);
+        this.tweens.add({ targets: txt, alpha: 0, duration: 800, delay: 1000, onComplete: () => txt.destroy() });
         break;
       }
     }
